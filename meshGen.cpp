@@ -1,5 +1,7 @@
-#include <meshGen.h>
+#include "meshGen.h"
 
+
+using namespace std;
 
 void createLinspace(double* Vect, double mini, double maxi, int n){
     double delta = (maxi - mini)/double(n-1);

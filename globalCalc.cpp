@@ -5,6 +5,8 @@
 #include "cblas.h"
 #include <iostream>
 #include <cmath>
+#include "PrintMatrices.h"
+
 
 using namespace std;
 
@@ -45,10 +47,15 @@ void FillMatrixglobDof(int n_elem, int* ElemNode, int* n_NodeDof, int n_node_ele
     int eDof;
     for (int j = 0; j < n_node; j++){
         eDof = globDof[2*j];
-        for(int k = 0; k < eDof; k++){
-            globDof[(eDof + 1)*j + k + 1] = nDof;
-            nDof = nDof + 1;
-        }
+        globDof[2*j + 1] = nDof;
+        nDof = nDof +1;
+
+//        for(int k = 0; k < eDof; k++){
+//            cout << 2*j + k + 1 <<endl;
+//            globDof[2*j + k + 1] = nDof;
+//            nDof = nDof + 1;
+//        }
+
     }
 }
 
@@ -115,7 +122,7 @@ void FillMatrixK(int n_elem, int gaussorder, int* ElemNode, double* Coord, int n
 
 
                 // shape function matrix
-                double N[4] = {0.25 * (1 - xi) * (1 - eta), 0.25 *(1 + xi) * (1 - eta), 0.25 * (1 + xi) * (1 + eta), 0.25 *(1 - xi) * (1 + eta) };
+               // double N[4] = {0.25 * (1 - xi) * (1 - eta), 0.25 *(1 + xi) * (1 - eta), 0.25 * (1 + xi) * (1 + eta), 0.25 *(1 - xi) * (1 + eta) };
 
                 // gradient of shape funcions
                 double GN[8] = {-0.25 *(1 - eta), 0.25*(1 - eta), 0.25*(1 + eta), -0.25*(1+eta), -0.25*(1 - xi), -0.25*(1 + xi), 0.25*(1+ xi), 0.25*(1 - xi)} ;
@@ -175,8 +182,6 @@ void FillMatrixK(int n_elem, int gaussorder, int* ElemNode, double* Coord, int n
         //PrintMatrix(4, 4, Ke);
         //PrintMatrixInt(1,4, gDof);
 
-
-
         //inserting the global stiffness matix into the global system
         //stiffness matri
 
@@ -191,6 +196,13 @@ void FillMatrixK(int n_elem, int gaussorder, int* ElemNode, double* Coord, int n
             K[i*n_node + j] = data[point];
         }
     }
+
+    delete gDofNode;
+    delete[] J;
+    delete[] Jinv;
+    delete[] C;
+    delete[] B;
+    delete[] E;
 
 }
 
@@ -210,13 +222,13 @@ void FillMatrixFluxNodes(int* fluxNodes, int* NodeTopo,int n_elx, int n_ely, cha
         }
     }
 
-    else if (side == 'T'){
+    else if (side == 'B'){
         for(int j = 0; j < n_elx + 1; j++){
             fluxNodes[j] = NodeTopo[j];
         }
     }
 
-    else if (side =='B'){
+    else if (side =='T'){
         for(int j = 0; j < n_elx + 1; j++){
             fluxNodes[j] = NodeTopo[j + (n_elx + 1) * (n_ely)];
         }
@@ -287,6 +299,7 @@ void FillMatrixf(double* f, int nbe, double* n_bc, double* coord, double* GP, in
             flux = cblas_ddot(2, N,1,n_bce,1); //calculating flux
 
 
+
             //calculating the nodal flux
             // fq = fq + w[i]* N * flux * detJ * t_p
             MatrixScale(N, 1, 2 , W);
@@ -296,6 +309,7 @@ void FillMatrixf(double* f, int nbe, double* n_bc, double* coord, double* GP, in
 
             MatrixScale(N, 2, 1 , detJ);
 
+
             MatrixScale(N, 2, 1 , t_p);
 
             MatrixAdd(fq, 2, 1 , N);
@@ -303,13 +317,10 @@ void FillMatrixf(double* f, int nbe, double* n_bc, double* coord, double* GP, in
         }
 
         MatrixScale(fq, 2, 1 , -1.0); // fq = -fq
+
         f[node1] = f[node1] + fq[0];
         f[node2] = f[node2] + fq[1];
-
-
     }
-
-
 }
 
 
@@ -331,7 +342,7 @@ void FillMatrixBC(double* BC, int* NodeTopo,  double T0, int n_elx, int n_ely,in
         }
     }
 
-    else if (side == 'T'){
+    else if (side == 'B'){
         for(int j = 0; j < n_elx + 1; j++){
             TempNode[j]= NodeTopo[j];
             BC[2*j] = TempNode[j];
@@ -339,9 +350,9 @@ void FillMatrixBC(double* BC, int* NodeTopo,  double T0, int n_elx, int n_ely,in
         }
     }
 
-    else if (side =='B'){
+    else if (side =='T'){
         for(int j = 0; j < n_elx + 1; j++){
-            TempNode[j] = NodeTopo[j + (n_elx + 1) * (n_ely)];
+            TempNode[j] = NodeTopo[j + (n_elx+1) * (n_ely)];
             BC[2*j] = TempNode[j];
             BC[2*j + 1] = T0;
         }
@@ -350,6 +361,7 @@ void FillMatrixBC(double* BC, int* NodeTopo,  double T0, int n_elx, int n_ely,in
     else{
         cout << "Invalid side Input." << endl;
     }
+
 
 }
 
@@ -391,19 +403,19 @@ void MatrixPartition(double* K_EE, double* K_FF, double* K_EF, double* K, int nD
             mask_E1 = mask_E[i];
             mask_E2 = mask_E[j];
 
-            if (mask_E1 == true & mask_E2 == true){
+            if ((mask_E1 == true) & (mask_E2 == true)){
                 K_EE[counter3] = K[i*nDof + j];
                 counter3 = counter3+1;
 
             }
 
-            else if (mask_E1 == false & mask_E2 == false){
+            else if ((mask_E1 == false) & (mask_E2 == false)){
                 K_FF[counter4] = K[i*nDof + j];
                 counter4 = counter4 + 1;
 
             }
 
-            else if (mask_E1 == true & mask_E2 == false){
+            else if ((mask_E1 == true) & (mask_E2 == false)){
                 K_EF[counter5] = K[i*nDof + j];
                 counter5 = counter5 + 1;
             }

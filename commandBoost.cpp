@@ -64,6 +64,25 @@ void getVal (int argc, char* argv[]){
     const char T_BC = vm["T_BC"].as<char>();
     const char q_BC = vm["q_BC"].as<char>();
 
+    /////// creating matrix D /////////////
+        double* D = new double[2*2];
+        D[0] = k_xx;
+        D[1] = k_xy;
+        D[2] = k_xy;
+        D[3] = k_yy;
+    //// creatimg D_test matrix to test if positive definite
+        double* D_test = new double[2*2];
+        bool pass;
+        D_test[0] = k_xx;
+        D_test[1] = k_xy;
+        D_test[2] = k_xy;
+        D_test[3] = k_yy;
+        pass = checkPositiveDefinite(2,  D_test);
+
+        if (pass == false){
+            cout << "D matrix is not positive definite!" << endl;
+        }
+
 
 }
 

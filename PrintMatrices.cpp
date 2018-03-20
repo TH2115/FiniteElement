@@ -1,10 +1,15 @@
 #include "PrintMatrices.h"
+#include <iostream>
+#include <cstdlib>
+#include <iomanip>
+
+using namespace std;
 
 // Print a matrix
 void PrintMatrix(int n, int k, double* H) {
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < k; ++j) {
-            cout << setw(5) << H[i*k+j] << " ";
+            cout << setw(1) << setprecision(6)<< H[i*k+j] << " ";
         }
         cout << endl;
     }
@@ -14,7 +19,7 @@ void PrintMatrix(int n, int k, double* H) {
 void PrintMatrixInt(int n, int k, int* H) {
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < k; ++j) {
-            cout << setw(5) << H[i*k+j] << " ";
+            cout << setw(1) << H[i*k+j] << " ";
         }
         cout << endl;
     }
@@ -24,7 +29,7 @@ void PrintMatrixInt(int n, int k, int* H) {
 void PrintMatrixBool(int n, int k, bool* H) {
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < k; ++j) {
-            cout << setw(5) << H[i*k+j] << " ";
+            cout << setw(1) << H[i*k+j] << " ";
         }
         cout << endl;
     }

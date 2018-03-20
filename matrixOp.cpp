@@ -1,4 +1,7 @@
-#include <MatrixOp.h>
+#include "MatrixOp.h"
+#include <iostream>
+
+using namespace std;
 
 
 void MatrixScale(double* A, int n, int k , double c){
