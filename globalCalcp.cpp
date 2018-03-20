@@ -1,4 +1,4 @@
-#include "globalCalc.h"
+#include "globalCalcp.h"
 #include "MatrixOp.h"
 #include "triple.h"
 #include <map>
@@ -49,27 +49,19 @@ void FillMatrixglobDof(int n_elem, int* ElemNode, int* n_NodeDof, int n_node_ele
         eDof = globDof[2*j];
         globDof[2*j + 1] = nDof;
         nDof = nDof +1;
-
-//        for(int k = 0; k < eDof; k++){
-//            cout << 2*j + k + 1 <<endl;
-//            globDof[2*j + k + 1] = nDof;
-//            nDof = nDof + 1;
-//        }
-
     }
 }
 
 
 
-void FillMatrixK(int n_elem, int gaussorder, int* ElemNode, double* Coord, int n_node_elem,int n_node, int* globDof, int* n_NodeDof, double* K, double* D, double t_p, int n_Dof, double* GP, double W){
+void FillMatrixK(int n_elem_upper,int n_elem_lower, int gaussorder, int* ElemNode, double* Coord, int n_node_elem,int n_node, int* globDof, int* n_NodeDof, double* K, double* D, double t_p, int n_Dof, double* GP, double W, int* Top){
     map<triple,double>data;
-
     int gauss = gaussorder; // gauss order
     int eNodes[1]; // node elements
     double eCoordx;
     double eCoordy;
     double eCoord[8]; //node coordinates
-    int* gDofNode = new int;
+    int* gDofNode = new int();
     double eta;
     double xi;
 
@@ -86,12 +78,11 @@ void FillMatrixK(int n_elem, int gaussorder, int* ElemNode, double* Coord, int n
     triple point;
 
 
-
     //// assemble K /////
 
-    for(int i = 0 ; i < n_elem; i++){
+    for(int i = n_elem_lower ; i < n_elem_upper; i++){
     //data for element i
-        double Ke[16] = {0};
+        double Ke[n_node_elem*n_node_elem] = {0};
         int gDof[n_node_elem*(n_node_elem-1)] = {0};// used to contruct scatter matrix
 
         for (int j = 1; j < 5; j++){
@@ -102,7 +93,6 @@ void FillMatrixK(int n_elem, int gaussorder, int* ElemNode, double* Coord, int n
             eCoord[2*(j-1) + 1] = eCoordy;
         }
 
-        //PrintMatrixInt(n_node, 2,globDof);
 
         for (int j = 0; j < n_node_elem; j++){
             //global dof for node j
@@ -112,6 +102,7 @@ void FillMatrixK(int n_elem, int gaussorder, int* ElemNode, double* Coord, int n
             }
         }
 
+
         // local stiffness matrix K_e found by gauss integration //
 
         for (int n = 0; n < gauss; n++){
@@ -119,86 +110,43 @@ void FillMatrixK(int n_elem, int gaussorder, int* ElemNode, double* Coord, int n
                 eta = GP[n];
                 xi = GP[m];
 
-
-
-                // shape function matrix
-               // double N[4] = {0.25 * (1 - xi) * (1 - eta), 0.25 *(1 + xi) * (1 - eta), 0.25 * (1 + xi) * (1 + eta), 0.25 *(1 - xi) * (1 + eta) };
-
                 // gradient of shape funcions
                 double GN[8] = {-0.25 *(1 - eta), 0.25*(1 - eta), 0.25*(1 + eta), -0.25*(1+eta), -0.25*(1 - xi), -0.25*(1 + xi), 0.25*(1+ xi), 0.25*(1 - xi)} ;
-                //PrintMatrix(2,4,GN);
-                //jacobian
 
+                //jacobian
                 cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 2, 2, 4, 1.0, GN, 4, eCoord, 2, 0.0, J, 2);
-                //PrintMatrix(2,2,J);
 
                 //determinant of jacobian and inverse
                 MatrixInv2by2(J, Jinv, DetJ);
-                //PrintMatrix(2,2,Jinv);
-
-
-
 
                 cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 2, 4, 2, 1.0, Jinv , 2, GN, 4, 0.0, B, 4);
 
-                //PrintMatrix(2,4,B);
-               // MatrixTrans( 2,  4 ,  B,  transB);
-                //PrintMatrix(4,2,transB);
-
                 // Ke = Ke + B'*D*B*th*DetJ*Wi*Wj
                 cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 4, 2, 2, 1.0, B , 4, D, 2, 0.0, C, 2);
-                //PrintMatrix(2,2,D);
-
-                //PrintMatrix(4,2,C);
 
                 cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 4, 4, 2, 1.0, C , 2, B, 4, 0.0, E, 4);
-                //PrintMatrix(4,4,E);
 
                 scale = (t_p)*(DetJ)*(W)*(W);
 
-               // cout << "SCALE = " << scale << endl;
-
-               // cout << "DET J = " << DetJ << endl;
-                //cout << "T_p = " << t_p << endl;
-
                 MatrixScale( E, 4, 4 , scale);
-                //PrintMatrix(4,4,E);
+
                 MatrixAdd(Ke, 4 , 4 , E);
 
-                //PrintMatrix(4,4,Ke);
-
             }
         }
-
-        for (int j = 0; j < n_node_elem; j++ ){
-            for (int k = 0; k < n_node_elem; k++){
-                point.x = gDof[k];
-                point.y = gDof[j];
-                data[point] = data[point] + Ke[j*n_node_elem + k];
-            }
-        }
-
-
-        //PrintMatrix(4, 4, Ke);
-        //PrintMatrixInt(1,4, gDof);
-
         //inserting the global stiffness matix into the global system
-        //stiffness matri
+        //stiffness matrix
 
-
-    }
-
-
-    for (int i = 0; i < n_Dof; i ++){
-        for (int j  = 0; j < n_Dof; j++){
-            point.x = j;
-            point.y = i;
-            K[i*n_node + j] = data[point];
+        for (int j = 0; j < n_node_elem; j++){ // column
+            int TopX = Top[i*n_node_elem+j]; // find topology location
+            for (int k = 0; k < n_node_elem; k++){ // row
+                int TopY = Top[i*n_node_elem + k];// find topology location
+                K[TopY*n_node+TopX] += Ke[j*n_node_elem+k]; // replaced nDof with nnode
+            }
         }
+
     }
-
-    //PrintMatrix(n_Dof,n_Dof,K);
-
+    ////clearing memory
     delete gDofNode;
     delete[] J;
     delete[] Jinv;

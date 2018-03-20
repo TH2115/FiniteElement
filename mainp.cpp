@@ -17,10 +17,11 @@
 #include "meshGen.h"
 #include "triple.h"
 #include "ElementCalc.h"
-#include "globalCalc.h"
+#include "globalCalcp.h"
 #include <boost/program_options.hpp>
 #include "VTKO.h"
 #include <string>
+#include <mpi.h>
 
 // An alias to reduce typing
 using namespace std;
@@ -104,8 +105,6 @@ int main(int argc, char* argv[])
     char q_BC_side = vm["q_BC_side"].as<char>();
     double q_BC = vm["q_BC"].as<double>();
 
-
-
     /////// creating matrix D /////////////
     double* D = new double[2*2]();
     //cout<<"\n"<<endl;
@@ -183,10 +182,14 @@ int main(int argc, char* argv[])
     //PrintMatrixInt(N_elem, N_node_elem, Top);
 
     FillMatrixglobDof(N_elem, ElemNode, N_NodeDof, N_node_elem, N_node, globDof, nDof);
-    //PrintMatrixInt(N_node, 2,globDof);
+
 
 /////////////////////// Assembly of global stiffness matrix K ////////
 
+
+
+
+    double* K1 = new double[nDof * nDof]();
     double* K = new double[nDof * nDof]();
         ///////// gauss points and weights /////////////
     //weights
@@ -194,9 +197,42 @@ int main(int argc, char* argv[])
     // gauss points
     double GP[2] = {-1.0/sqrt(3.0), 1.0/sqrt(3.0)};
 
-    FillMatrixK(N_elem, gaussorder, ElemNode, coord, N_node_elem, N_node, globDof, N_NodeDof, K,  D,  t_p, nDof, GP, W);
-    //PrintMatrix(nDof,nDof,K);
+   ////////spliting domain //////
 
+    //// begin commnication ///
+    int rank, size, retval_rank, retval_size;
+    MPI_Init(&argc, &argv);
+    retval_rank = MPI_Comm_rank( MPI_COMM_WORLD, &rank);
+    retval_size = MPI_Comm_size( MPI_COMM_WORLD, &size);
+
+    if (retval_rank == MPI_ERR_COMM || retval_size == MPI_ERR_COMM){
+        cout << "Invalid communicator." <<endl;
+        return 1;
+    }
+
+
+    //// now send and receive info ////
+    if (rank == 0){
+        int N_elem_upper1 = floor(N_elem / size);
+        int N_elem_lower1 = 0;
+        FillMatrixK( N_elem_upper1,N_elem_lower1, gaussorder, ElemNode, coord, N_node_elem, N_node, globDof, N_NodeDof, K1,  D,  t_p, nDof, GP, W, Top);
+
+        MPI_Recv(K,nDof*nDof,MPI_DOUBLE,1,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+
+        for (int i = 0; i < nDof*nDof; i++){
+            K[i] += K1[i];
+        }
+
+    }
+    else {
+        int N_elem_upper2 = N_elem;
+        int N_elem_lower2 = floor(N_elem / size);
+        FillMatrixK( N_elem_upper2,N_elem_lower2, gaussorder, ElemNode, coord, N_node_elem, N_node, globDof, N_NodeDof, K,  D,  t_p, nDof, GP, W, Top);
+
+        MPI_Send(K,nDof*nDof,MPI_DOUBLE,0,0,MPI_COMM_WORLD);
+    }
+
+    MPI_Finalize();
 
 /////////////////////// Begin solving for Case 1 ///////////////
 
@@ -299,6 +335,8 @@ int main(int argc, char* argv[])
     double* T_F = new double[nDof - sideDimT]();
     double* f_E = new double[sideDimT]();
 
+
+
     MatrixPartition(K_EE, K_FF,  K_EF,  K, nDof,  sideDimT,  TempNode,  T,  f,  T_E, f_F,mask_E);
 
     //PrintMatrix(sideDimT,sideDimT,K_EE);
@@ -319,7 +357,12 @@ int main(int argc, char* argv[])
     //PrintMatrix(1,nDof-sideDimT,T_F);
     int* ipiv1 = new int[nDof-sideDimT];
     int info1;
+
+
+
     F77NAME(dgesv)(nDof-sideDimT, 1, K_FF,nDof-sideDimT, ipiv1, T_F ,nDof-sideDimT, info1);
+
+
 
     delete[] ipiv1;
     //PrintMatrix(1,nDof-sideDimT,T_F);
