@@ -10,7 +10,7 @@
 #include <map>
 #include <stdlib.h>
 #include <stdio.h>
-#include "getNumbers.h"
+#include "checkPositiveDef.h"
 #include "lapackRoutines.h"
 #include "PrintMatrices.h"
 #include "MatrixOp.h"
@@ -22,6 +22,7 @@
 #include "VTKO.h"
 #include <string>
 #include <mpi.h>
+#include <sys/time.h>
 
 // An alias to reduce typing
 using namespace std;
@@ -42,6 +43,8 @@ extern "C" {
 
 int main(int argc, char* argv[])
 {
+        struct timeval start, endt;
+        gettimeofday(&start, NULL);
 
     //////// using Boost library to get command line arguments//////
     //////// Default values are those for caes 1///////////////
@@ -104,6 +107,8 @@ int main(int argc, char* argv[])
     double T_BC = vm["T_BC"].as<double>();
     char q_BC_side = vm["q_BC_side"].as<char>();
     double q_BC = vm["q_BC"].as<double>();
+
+
 
     /////// creating matrix D /////////////
     double* D = new double[2*2]();
@@ -182,38 +187,31 @@ int main(int argc, char* argv[])
     //PrintMatrixInt(N_elem, N_node_elem, Top);
 
     FillMatrixglobDof(N_elem, ElemNode, N_NodeDof, N_node_elem, N_node, globDof, nDof);
-
+    //PrintMatrixInt(N_node, 2,globDof);
 
 /////////////////////// Assembly of global stiffness matrix K ////////
 
 
-
-
-    double* K1 = new double[nDof * nDof]();
     double* K = new double[nDof * nDof]();
-        ///////// gauss points and weights /////////////
+    double* K1 = new double[nDof * nDof]();
+    ///////// gauss points and weights /////////////
     //weights
     double W = 1.0;
     // gauss points
     double GP[2] = {-1.0/sqrt(3.0), 1.0/sqrt(3.0)};
 
-   ////////spliting domain //////
-
-    //// begin commnication ///
-    int rank, size, retval_rank, retval_size;
+    int my_rank, my_size, retval_rank, retval_size;
     MPI_Init(&argc, &argv);
-    retval_rank = MPI_Comm_rank( MPI_COMM_WORLD, &rank);
-    retval_size = MPI_Comm_size( MPI_COMM_WORLD, &size);
-
-    if (retval_rank == MPI_ERR_COMM || retval_size == MPI_ERR_COMM){
-        cout << "Invalid communicator." <<endl;
+    retval_rank = MPI_Comm_rank(MPI_COMM_WORLD,&my_rank);
+    retval_size = MPI_Comm_size(MPI_COMM_WORLD,&my_size);
+    if ((retval_rank ==MPI_ERR_COMM)|| (retval_size == MPI_ERR_COMM)) {
+        cout << "Invalid communicator!" << endl;
         return 1;
-    }
-
+    };
 
     //// now send and receive info ////
-    if (rank == 0){
-        int N_elem_upper1 = floor(N_elem / size);
+    if (my_rank == 0){
+        int N_elem_upper1 = floor(N_elem / my_size);
         int N_elem_lower1 = 0;
         FillMatrixK( N_elem_upper1,N_elem_lower1, gaussorder, ElemNode, coord, N_node_elem, N_node, globDof, N_NodeDof, K1,  D,  t_p, nDof, GP, W, Top);
 
@@ -226,19 +224,14 @@ int main(int argc, char* argv[])
     }
     else {
         int N_elem_upper2 = N_elem;
-        int N_elem_lower2 = floor(N_elem / size);
+        int N_elem_lower2 = floor(N_elem / my_size);
         FillMatrixK( N_elem_upper2,N_elem_lower2, gaussorder, ElemNode, coord, N_node_elem, N_node, globDof, N_NodeDof, K,  D,  t_p, nDof, GP, W, Top);
 
         MPI_Send(K,nDof*nDof,MPI_DOUBLE,0,0,MPI_COMM_WORLD);
     }
-
-    MPI_Finalize();
-
-/////////////////////// Begin solving for Case 1 ///////////////
+/////////////////////// Begin solving///////////////
 
     // compute nodal boundary flux vector
-
-    ///////Define edges --- RIGHT EDGE//////////////
     ////////////////////// USE N_ely for right/left, N_elx for top/bottom
     int sideDimFlux;
 
@@ -255,7 +248,7 @@ int main(int argc, char* argv[])
     int* fluxNodes = new int[sideDimFlux]();
     int nFluxNodes = sideDimFlux;
     FillMatrixFluxNodes(fluxNodes, NodeTopo, N_elx, N_ely, q_BC_side);
-    //PrintMatrixInt(1,N_ely+1,fluxNodes);
+
 
     ////// Defining load /////////////
 
@@ -291,7 +284,6 @@ int main(int argc, char* argv[])
     int* TempNode = new int[sideDimT];
     FillMatrixBC( BC,  NodeTopo,  T_BC,  N_elx,  N_ely,TempNode, T_BC_side );
 
-    //PrintMatrix(N_ely + 1,2,BC);
 
     //////////////// Assembling global force vector /////////////
 
@@ -319,8 +311,7 @@ int main(int argc, char* argv[])
         }
     }
 
-   // PrintMatrixInt(1,rDof , RedDof);
-    //PrintMatrix(1,nDof,OrgDof);
+
     delete[] BC;
     delete[] ElemX;
     delete[] ElemY;
@@ -335,21 +326,21 @@ int main(int argc, char* argv[])
     double* T_F = new double[nDof - sideDimT]();
     double* f_E = new double[sideDimT]();
 
-
-
     MatrixPartition(K_EE, K_FF,  K_EF,  K, nDof,  sideDimT,  TempNode,  T,  f,  T_E, f_F,mask_E);
 
-    //PrintMatrix(sideDimT,sideDimT,K_EE);
-    //PrintMatrix(nDof - sideDimT, nDof - sideDimT, K_FF);
-    //PrintMatrix(nDof -sideDimT,sideDimT,K_EF);
     delete[] TempNode;
 
-////////////////////// Solve for D_F ///////////////
 
 
+    ////////////////// split processes to finding T and f/////////////////////////
+
+
+    if (my_rank == 0){
+
+    ////////////finding T/////////////////
     cblas_dgemv(CblasRowMajor, CblasTrans, sideDimT, nDof- sideDimT, 1.0, K_EF,nDof - sideDimT, T_E, 1 , 0.0, T_F, 1);
 
-    //cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 4, 2, 2, 1.0, B , 4, D, 2, 0.0, C, 2);
+
     MatrixScale( T_F, 1, nDof-sideDimT , -1);
 
     MatrixAdd(T_F, 1 , nDof-sideDimT , f_F);
@@ -357,21 +348,20 @@ int main(int argc, char* argv[])
     //PrintMatrix(1,nDof-sideDimT,T_F);
     int* ipiv1 = new int[nDof-sideDimT];
     int info1;
-
-
-
     F77NAME(dgesv)(nDof-sideDimT, 1, K_FF,nDof-sideDimT, ipiv1, T_F ,nDof-sideDimT, info1);
-
-
 
     delete[] ipiv1;
     //PrintMatrix(1,nDof-sideDimT,T_F);
 
-/////////// reconstruction of global tempterature ////////////////////
+    //// reconstruction of global tempterature ////
 
     GlobalReconstruct(T_E,  T_F,  mask_E,  nDof, T);
-    //PrintMatrix(1,nDof,T);
-////////////// compute reaction f_E /////////////
+
+    }
+
+    else {
+
+    ////////////// compute reaction f /////////////
 
     double* K_EEdotT_E = new double[sideDimT]();
     cblas_dgemv(CblasRowMajor, CblasNoTrans, sideDimT, sideDimT, 1.0, K_EE ,sideDimT, T_E, 1 , 0.0, K_EEdotT_E, 1);
@@ -383,8 +373,12 @@ int main(int argc, char* argv[])
     MatrixAdd(f_E, 1, sideDimT, K_EEdotT_E);
     MatrixAdd(f_E, 1, sideDimT, K_EFdotT_F);
 
-    //PrintMatrix(1,sideDimT,f_E);
+    //global reconstruction of f ////////
     GlobalReconstruct(f_E,  f_F,  mask_E,  nDof, f);
+
+    delete[] K_EFdotT_F;
+    delete[] K_EEdotT_E;
+    }
 
 
 
@@ -396,9 +390,6 @@ int main(int argc, char* argv[])
     WriteVTK(coord, ElemNode, N_node, N_elem, T, filename);
 
 
-
-    delete[] K_EFdotT_F;
-    delete[] K_EEdotT_E;
     delete[] f_E;
     delete[] f_F;
     delete[] T_E;
@@ -408,6 +399,11 @@ int main(int argc, char* argv[])
     delete[] K_FF;
     delete[] ElemNode;
     delete[] NodeTopo;
+    MPI_Finalize();
 
+    gettimeofday(&endt, NULL);
+
+
+    cout << "Time: " << ((endt.tv_sec - start.tv_sec) * 1000000u + endt.tv_usec - start.tv_usec)/1.e6 << endl;
 
 }

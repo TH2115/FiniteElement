@@ -49,13 +49,6 @@ void FillMatrixglobDof(int n_elem, int* ElemNode, int* n_NodeDof, int n_node_ele
         eDof = globDof[2*j];
         globDof[2*j + 1] = nDof;
         nDof = nDof +1;
-
-//        for(int k = 0; k < eDof; k++){
-//            cout << 2*j + k + 1 <<endl;
-//            globDof[2*j + k + 1] = nDof;
-//            nDof = nDof + 1;
-//        }
-
     }
 }
 
@@ -82,7 +75,6 @@ void FillMatrixK(int n_elem, int gaussorder, int* ElemNode, double* Coord, int n
     double* B = new double[2 * 4];
     double* E = new double[4 * 4];
     double scale;
-   // double* transB = new double[2 * 4];
     triple point;
 
 
@@ -102,8 +94,6 @@ void FillMatrixK(int n_elem, int gaussorder, int* ElemNode, double* Coord, int n
             eCoord[2*(j-1) + 1] = eCoordy;
         }
 
-        //PrintMatrixInt(n_node, 2,globDof);
-
         for (int j = 0; j < n_node_elem; j++){
             //global dof for node j
             for(int k = 1; k < n_NodeDof[j] + 1  ; k++){
@@ -119,53 +109,28 @@ void FillMatrixK(int n_elem, int gaussorder, int* ElemNode, double* Coord, int n
                 eta = GP[n];
                 xi = GP[m];
 
-
-
-                // shape function matrix
-               // double N[4] = {0.25 * (1 - xi) * (1 - eta), 0.25 *(1 + xi) * (1 - eta), 0.25 * (1 + xi) * (1 + eta), 0.25 *(1 - xi) * (1 + eta) };
-
                 // gradient of shape funcions
                 double GN[8] = {-0.25 *(1 - eta), 0.25*(1 - eta), 0.25*(1 + eta), -0.25*(1+eta), -0.25*(1 - xi), -0.25*(1 + xi), 0.25*(1+ xi), 0.25*(1 - xi)} ;
-                //PrintMatrix(2,4,GN);
-                //jacobian
 
+                //jacobian
                 cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 2, 2, 4, 1.0, GN, 4, eCoord, 2, 0.0, J, 2);
-                //PrintMatrix(2,2,J);
 
                 //determinant of jacobian and inverse
                 MatrixInv2by2(J, Jinv, DetJ);
-                //PrintMatrix(2,2,Jinv);
-
-
-
 
                 cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 2, 4, 2, 1.0, Jinv , 2, GN, 4, 0.0, B, 4);
 
-                //PrintMatrix(2,4,B);
-               // MatrixTrans( 2,  4 ,  B,  transB);
-                //PrintMatrix(4,2,transB);
-
                 // Ke = Ke + B'*D*B*th*DetJ*Wi*Wj
                 cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 4, 2, 2, 1.0, B , 4, D, 2, 0.0, C, 2);
-                //PrintMatrix(2,2,D);
-
-                //PrintMatrix(4,2,C);
 
                 cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 4, 4, 2, 1.0, C , 2, B, 4, 0.0, E, 4);
                 //PrintMatrix(4,4,E);
 
                 scale = (t_p)*(DetJ)*(W)*(W);
 
-               // cout << "SCALE = " << scale << endl;
-
-               // cout << "DET J = " << DetJ << endl;
-                //cout << "T_p = " << t_p << endl;
-
                 MatrixScale( E, 4, 4 , scale);
-                //PrintMatrix(4,4,E);
-                MatrixAdd(Ke, 4 , 4 , E);
 
-                //PrintMatrix(4,4,Ke);
+                MatrixAdd(Ke, 4 , 4 , E);
 
             }
         }
@@ -177,17 +142,9 @@ void FillMatrixK(int n_elem, int gaussorder, int* ElemNode, double* Coord, int n
                 data[point] = data[point] + Ke[j*n_node_elem + k];
             }
         }
-
-
-        //PrintMatrix(4, 4, Ke);
-        //PrintMatrixInt(1,4, gDof);
-
-        //inserting the global stiffness matix into the global system
-        //stiffness matri
-
-
     }
-
+//inserting the global stiffness matix into the global system
+        //stiffness matri
 
     for (int i = 0; i < n_Dof; i ++){
         for (int j  = 0; j < n_Dof; j++){
@@ -196,8 +153,6 @@ void FillMatrixK(int n_elem, int gaussorder, int* ElemNode, double* Coord, int n
             K[i*n_node + j] = data[point];
         }
     }
-
-    //PrintMatrix(n_Dof,n_Dof,K);
 
     delete gDofNode;
     delete[] J;
@@ -300,8 +255,6 @@ void FillMatrixf(double* f, int nbe, double* n_bc, double* coord, double* GP, in
 
             flux = cblas_ddot(2, N,1,n_bce,1); //calculating flux
 
-
-
             //calculating the nodal flux
             // fq = fq + w[i]* N * flux * detJ * t_p
             MatrixScale(N, 1, 2 , W);
@@ -371,8 +324,6 @@ void FillMatrixBC(double* BC, int* NodeTopo,  double T0, int n_elx, int n_ely,in
 void MatrixPartition(double* K_EE, double* K_FF, double* K_EF, double* K, int nDof, int sideDimT, int* TempNode, double* T, double* f, double* T_E, double* f_F, bool* mask_E){
 
 
-
-
     for(int i = 0; i < sideDimT ; i++){
         mask_E[TempNode[i]] = true;
     }
@@ -391,8 +342,6 @@ void MatrixPartition(double* K_EE, double* K_FF, double* K_EF, double* K, int nD
         }
     }
 
-    //PrintMatrix(1,6,T_E);
-    //PrintMatrix(1,nDof - 6, f_F);
     bool mask_E1;
     bool mask_E2;
     int counter3 = 0;

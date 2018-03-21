@@ -1,3 +1,7 @@
+////////////////// THIS SOURCE CONTAINS ALL OF THE NECESSARY CALCULATIONS TO FIND THE ELEMENT
+///////////// STIFFNESS MATRICES
+
+
 #include "ElementCalc.h"
 #include "meshGen.h"
 
@@ -20,7 +24,6 @@ void FillMatrixY(int n_elx, int n_ely, double* Y, double* h) {
 
 // filling  coordinate matrix
 void FillMatrixCoord(int n_elx, int n_ely, double* x, double* Y, double* coord) {
-
     for(int i = 0; i < n_elx+1 ; i++){
         for(int j = 0; j < n_ely+1; j++){
             coord[2*i*(n_ely+1)+(2*j)] = x[i];
@@ -31,7 +34,6 @@ void FillMatrixCoord(int n_elx, int n_ely, double* x, double* Y, double* coord) 
 
 // filling topology matrix
 void FillMatrixTopo(int n_elx, int n_ely, int* NodeTopo) {
-
     for(int j = 0; j < n_ely+1; j++){
         for(int i = 0; i < n_elx+1 ; i++){
             NodeTopo[i + j*(n_elx+1)] = j + i*(n_ely+1);
@@ -41,7 +43,6 @@ void FillMatrixTopo(int n_elx, int n_ely, int* NodeTopo) {
 
 // filling element node matrix
 void FillMatrixElemNode(int n_elx, int n_ely, int* ElemNode, int* NodeTopo) {
-
     int elemnr = 0;
     for(int i = 0; i < n_elx ; i++){
         for(int j = 0; j < n_ely; j++){
@@ -59,9 +60,6 @@ void FillMatrixElemNode(int n_elx, int n_ely, int* ElemNode, int* NodeTopo) {
 
 // filling element node matrix
 void FillMatrixElemXY(int n_elem, int n_node_elem, int* ElemNode, double* coord, double* ElemX, double* ElemY ) {
-
-//    int* eNodes = new int[n_node_elem];
-//    double* eCoord = new double[n_node_elem * 2];
     int eNodes;
     double eCoordx;
     double eCoordy;

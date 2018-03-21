@@ -10,7 +10,7 @@
 #include <map>
 #include <stdlib.h>
 #include <stdio.h>
-#include "getNumbers.h"
+#include "checkPositiveDef.h"
 #include "lapackRoutines.h"
 #include "PrintMatrices.h"
 #include "MatrixOp.h"
@@ -21,6 +21,7 @@
 #include <boost/program_options.hpp>
 #include "VTKO.h"
 #include <string>
+#include <sys/time.h>
 
 // An alias to reduce typing
 using namespace std;
@@ -41,7 +42,8 @@ extern "C" {
 
 int main(int argc, char* argv[])
 {
-
+        struct timeval start, endt;
+        gettimeofday(&start, NULL);
     //////// using Boost library to get command line arguments//////
     //////// Default values are those for caes 1///////////////
         po::options_description opts(
@@ -108,7 +110,6 @@ int main(int argc, char* argv[])
 
     /////// creating matrix D /////////////
     double* D = new double[2*2]();
-    //cout<<"\n"<<endl;
 
     D[0] = Kxx;
     D[1] = Kxy;
@@ -156,14 +157,12 @@ int main(int argc, char* argv[])
     // cordinates of nodes //
     double* coord = new double [N_node * 2]();
     FillMatrixCoord(N_elx, N_ely, x, Y, coord);
-    //PrintMatrix(N_elem,2,coord);
     delete[] Y;
 
 /////////////Calculation of topology matrix NodeTopo//////////
 
     int* NodeTopo = new int[(N_elx+1) * (N_ely+1)]();
     FillMatrixTopo(N_elx, N_ely, NodeTopo);
-   // PrintMatrixInt(N_ely + 1, N_elx + 1, NodeTopo);
 
 ////////// calculation of topology matrix ElemNode //////
     int* ElemNode = new int[N_elem*5]();
@@ -173,17 +172,12 @@ int main(int argc, char* argv[])
     double* ElemY = new double[N_elem*N_node_elem]();
     FillMatrixElemXY(N_elem, N_node_elem, ElemNode, coord, ElemX, ElemY );
 
-    //PrintMatrix(N_elem,N_node_elem,ElemX);
-    //PrintMatrix(N_elem,N_node_elem,ElemY);
-
     int* globDof = new int[N_node * 2 ]();
     int* Top = new int[N_elem * N_node_elem]();
     int nDof = 0;
     FillMatrixTop(N_elem, ElemNode, Top);
-    //PrintMatrixInt(N_elem, N_node_elem, Top);
 
     FillMatrixglobDof(N_elem, ElemNode, N_NodeDof, N_node_elem, N_node, globDof, nDof);
-    //PrintMatrixInt(N_node, 2,globDof);
 
 /////////////////////// Assembly of global stiffness matrix K ////////
 
@@ -198,7 +192,7 @@ int main(int argc, char* argv[])
     //PrintMatrix(nDof,nDof,K);
 
 
-/////////////////////// Begin solving for Case 1 ///////////////
+/////////////////////// Begin solving///////////////
 
     // compute nodal boundary flux vector
 
@@ -219,17 +213,15 @@ int main(int argc, char* argv[])
     int* fluxNodes = new int[sideDimFlux]();
     int nFluxNodes = sideDimFlux;
     FillMatrixFluxNodes(fluxNodes, NodeTopo, N_elx, N_ely, q_BC_side);
-    //PrintMatrixInt(1,N_ely+1,fluxNodes);
-
     ////// Defining load /////////////
 
     double* n_bc = new double[4 * (nFluxNodes-1)]();
 
     FillMatrixNBC( n_bc, nFluxNodes, fluxNodes,  q_BC);
-    //PrintMatrix(4,nFluxNodes - 1,n_bc);
+
 
     int nbe = nFluxNodes - 1; //number of elements with flux load
-    //PrintMatrix(N_elem,2,coord);
+
 
     double f[nDof] = {0};
 
@@ -255,7 +247,6 @@ int main(int argc, char* argv[])
     int* TempNode = new int[sideDimT];
     FillMatrixBC( BC,  NodeTopo,  T_BC,  N_elx,  N_ely,TempNode, T_BC_side );
 
-    //PrintMatrix(N_ely + 1,2,BC);
 
     //////////////// Assembling global force vector /////////////
 
@@ -283,8 +274,6 @@ int main(int argc, char* argv[])
         }
     }
 
-   // PrintMatrixInt(1,rDof , RedDof);
-    //PrintMatrix(1,nDof,OrgDof);
     delete[] BC;
     delete[] ElemX;
     delete[] ElemY;
@@ -301,9 +290,6 @@ int main(int argc, char* argv[])
 
     MatrixPartition(K_EE, K_FF,  K_EF,  K, nDof,  sideDimT,  TempNode,  T,  f,  T_E, f_F,mask_E);
 
-    //PrintMatrix(sideDimT,sideDimT,K_EE);
-    //PrintMatrix(nDof - sideDimT, nDof - sideDimT, K_FF);
-    //PrintMatrix(nDof -sideDimT,sideDimT,K_EF);
     delete[] TempNode;
 
 ////////////////////// Solve for D_F ///////////////
@@ -311,28 +297,26 @@ int main(int argc, char* argv[])
 
     cblas_dgemv(CblasRowMajor, CblasTrans, sideDimT, nDof- sideDimT, 1.0, K_EF,nDof - sideDimT, T_E, 1 , 0.0, T_F, 1);
 
-    //cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 4, 2, 2, 1.0, B , 4, D, 2, 0.0, C, 2);
     MatrixScale( T_F, 1, nDof-sideDimT , -1);
 
     MatrixAdd(T_F, 1 , nDof-sideDimT , f_F);
-    //PrintMatrix(1,nDof-sideDimT,f_F);
-    //PrintMatrix(1,nDof-sideDimT,T_F);
+
     int* ipiv1 = new int[nDof-sideDimT];
     int info1;
     F77NAME(dgesv)(nDof-sideDimT, 1, K_FF,nDof-sideDimT, ipiv1, T_F ,nDof-sideDimT, info1);
 
     delete[] ipiv1;
-    //PrintMatrix(1,nDof-sideDimT,T_F);
+
 
 /////////// reconstruction of global tempterature ////////////////////
 
     GlobalReconstruct(T_E,  T_F,  mask_E,  nDof, T);
-    //PrintMatrix(1,nDof,T);
+
 ////////////// compute reaction f_E /////////////
 
     double* K_EEdotT_E = new double[sideDimT]();
     cblas_dgemv(CblasRowMajor, CblasNoTrans, sideDimT, sideDimT, 1.0, K_EE ,sideDimT, T_E, 1 , 0.0, K_EEdotT_E, 1);
-    //PrintMatrix(1,sideDimT,K_EEdotT_E);
+
 
     double* K_EFdotT_F = new double[sideDimT]();
     cblas_dgemv(CblasRowMajor, CblasNoTrans, sideDimT, nDof-sideDimT, 1.0, K_EF ,nDof-sideDimT, T_F, 1 , 0.0, K_EFdotT_F, 1);
@@ -340,7 +324,6 @@ int main(int argc, char* argv[])
     MatrixAdd(f_E, 1, sideDimT, K_EEdotT_E);
     MatrixAdd(f_E, 1, sideDimT, K_EFdotT_F);
 
-    //PrintMatrix(1,sideDimT,f_E);
     GlobalReconstruct(f_E,  f_F,  mask_E,  nDof, f);
 
 
@@ -366,5 +349,8 @@ int main(int argc, char* argv[])
     delete[] ElemNode;
     delete[] NodeTopo;
 
+    gettimeofday(&endt, NULL);
+
+    cout << "Time: " << ((endt.tv_sec - start.tv_sec) * 1000000u + endt.tv_usec - start.tv_usec)/1.e6 << endl;
 
 }
