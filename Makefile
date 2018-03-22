@@ -11,8 +11,8 @@ ElementCalc.o: ElementCalc.cpp ElementCalc.h
 checkPositiveDef.o: checkPositiveDef.cpp checkPositiveDef.h
 	g++ -Wall -fexceptions -g  -c checkPositiveDef.cpp -o checkPositiveDef.o
 
-globalCalc.o: globalCalc.cpp globalCalc.h
-	g++ -Wall -fexceptions -g  -c globalCalc.cpp -o globalCalc.o
+globalCalcp.o: globalCalcp.cpp globalCalcp.h
+	g++ -Wall -fexceptions -g  -c globalCalcp.cpp -o globalCalcp.o
 
 matrixOp.o: matrixOp.cpp MatrixOp.h
 	g++ -Wall -fexceptions -g  -c matrixOp.cpp -o matrixOp.o
@@ -26,14 +26,10 @@ PrintMatrices.o: PrintMatrices.cpp PrintMatrices.h
 VTKO.o: VTKO.cpp VTKO.h
 	g++ -Wall -fexceptions -g  -c VTKO.cpp -o VTKO.o
 
-myprog: ElementCalc.o checkPositiveDef.o globalCalc.o main.o matrixOp.o meshGen.o PrintMatrices.o VTKO.o
-	g++  -o myprog ElementCalc.o checkPositiveDef.o globalCalc.o main.o matrixOp.o meshGen.o PrintMatrices.o VTKO.o  -lboost_program_options -lblas -llapack 
+myprog: ElementCalc.o checkPositiveDef.o globalCalcp.o main.o matrixOp.o meshGen.o PrintMatrices.o VTKO.o
+	g++  -o myprog ElementCalc.o checkPositiveDef.o globalCalcp.o main.o matrixOp.o meshGen.o PrintMatrices.o VTKO.o  -lboost_program_options -lblas -llapack 
 
 
-
-
-globalCalcp.o: globalCalcp.cpp globalCalcp.h
-	g++ -Wall -fexceptions -g  -c globalCalcp.cpp -o globalCalcp.o
 
 mainp.o: mainp.cpp 
 	mpicxx -Wall -fexceptions -g  -c mainp.cpp -o mainp.o
@@ -54,18 +50,20 @@ C3:
 
 
 
-
 C1p:
+	rm -f case4.vtk 
 	mpiexec -np 2 ./myprogp --case=4 --a=0 --h1=1.0 --h2=1.0 --L=2.0 --t_p=0.2 --Kxx=250.0 --Kyy=250.0 --Kxy=0.0 --Nelx=10 --Nely=5 --T_BC_side='L' --T_BC=10.0 --q_BC_side='R' --q_BC=2500.0
 
 C2p:
+	rm -f case5.vtk 
 	mpiexec -np 2 ./myprogp --case=5 --a=0 --h1=1.0 --h2=1.0 --L=2.0 --t_p=0.2 --Kxx=250.0 --Kyy=250.0 --Kxy=0.0 --Nelx=10 --Nely=5 --T_BC_side='B' --T_BC=10.0 --q_BC_side='T' --q_BC=2500.0
 
 C3p:	
+	rm -f case6.vtk 
 	mpiexec -np 2 ./myprogp --case=6 --a=0.25 --h1=1.0 --h2=1.3 --L=3.0 --t_p=0.2 --Kxx=250.0 --Kyy=250.0 --Kxy=0.0 --Nelx=15 --Nely=8 --T_BC_side='L' --T_BC=-20.0 --q_BC_side='B' --q_BC=-5000.0
 
 
 
 .PHONY: clean run
 clean:
-	rm -f *.o -f *.vtk
+	rm -f *.o -f *.vtk myprog myprogp
