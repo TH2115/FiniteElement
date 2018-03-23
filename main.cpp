@@ -310,32 +310,21 @@ int main(int argc, char *argv[]) {
 
   GlobalReconstruct(T_E, T_F, mask_E, nDof, T);
 
-  //    PrintMatrix(1,sideDimT, T_E);
-  //    PrintMatrix(sideDimT,sideDimT, K_EE);
-  //    PrintMatrix(1,nDof- sideDimT, T_F);
-  //    PrintMatrix(nDof- sideDimT,sideDimT, K_EF);
-
   ////////////// compute reaction f_E /////////////
 
   double *K_EEdotT_E = new double[sideDimT]();
   cblas_dgemv(CblasRowMajor, CblasNoTrans, sideDimT, sideDimT, 1.0, K_EE,
               sideDimT, T_E, 1, 0.0, K_EEdotT_E, 1);
-  // PrintMatrix(1,sideDimT,K_EEdotT_E);
 
   double *K_EFdotT_F = new double[sideDimT]();
   cblas_dgemv(CblasRowMajor, CblasNoTrans, sideDimT, nDof - sideDimT, 1.0, K_EF,
               nDof - sideDimT, T_F, 1, 0.0, K_EFdotT_F, 1);
-  // PrintMatrix(1,sideDimT,K_EFdotT_F);
 
   MatrixAdd(f_E, 1, sideDimT, K_EEdotT_E);
-  // PrintMatrix(sideDimFlux,1,f_E);
+
   MatrixAdd(f_E, 1, sideDimT, K_EFdotT_F);
-  // PrintMatrix(sideDimFlux,1,f_E);
 
   GlobalReconstruct(f_E, f_F, mask_E, nDof, f);
-  // PrintMatrix(sideDimFlux,1,f_E);
-  // PrintMatrix(nDof -sideDimFlux,1,f_F);
-  PrintMatrix(1, nDof, f);
 
   string filename = "case";
   string CaseN = to_string(CaseNum);

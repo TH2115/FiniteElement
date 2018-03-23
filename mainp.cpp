@@ -198,6 +198,8 @@ int main(int argc, char *argv[]) {
   // gauss points
   double GP[2] = {-1.0 / sqrt(3.0), 1.0 / sqrt(3.0)};
 
+  // split the number of elements in half and let each processor deal with
+  // finding Ke and assemblying to a global matrix
   int my_rank, my_size, retval_rank, retval_size;
   MPI_Init(&argc, &argv);
   retval_rank = MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
@@ -214,14 +216,13 @@ int main(int argc, char *argv[]) {
     FillMatrixKp(N_elem_upper1, N_elem_lower1, gaussorder, ElemNode, coord,
                  N_node_elem, N_node, globDof, N_NodeDof, K1, D, t_p, nDof, GP,
                  W, Top);
-
+    // now receive the bottom half K from process 1
     MPI_Recv(K, nDof * nDof, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD,
              MPI_STATUS_IGNORE);
 
     for (int i = 0; i < nDof * nDof; i++) {
       K[i] += K1[i];
     }
-    // MPI_Send(K,nDof*nDof,MPI_DOUBLE,1,1,MPI_COMM_WORLD);
 
   } else {
     int N_elem_upper2 = N_elem;
@@ -229,8 +230,8 @@ int main(int argc, char *argv[]) {
     FillMatrixKp(N_elem_upper2, N_elem_lower2, gaussorder, ElemNode, coord,
                  N_node_elem, N_node, globDof, N_NodeDof, K, D, t_p, nDof, GP,
                  W, Top);
+    // send the bottom half of K t process 0
     MPI_Send(K, nDof * nDof, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
-    // MPI_Recv(K,nDof*nDof,MPI_DOUBLE,0,1,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
   }
   /////////////////////// Begin solving///////////////
 
@@ -383,8 +384,6 @@ int main(int argc, char *argv[]) {
 
     GlobalReconstruct(f_E, f_F, mask_E, nDof, f);
 
-    PrintMatrix(1, nDof, f);
-
     delete[] K_EFdotT_F;
     delete[] K_EEdotT_E;
   }
@@ -402,7 +401,7 @@ int main(int argc, char *argv[]) {
 
   gettimeofday(&endt, NULL);
 
-  cout << "Time: "
+  cout << "Process " << my_rank << ": Time: "
        << ((endt.tv_sec - start.tv_sec) * 1000000u + endt.tv_usec -
            start.tv_usec) /
               1.e6
